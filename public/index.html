@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vegan Pizza Barcelona | Find Plant-Based Pizzas</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAPS_API_KEY&libraries=places"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore-compat.js"></script>
+    <style>
+        .map-container {
+            height: 60vh;
+            min-height: 400px;
+        }
+        .pizza-marker {
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%234CAF50"><path d="M12 2C8.14 2 5 5.14 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.86-3.14-7-7-7zm0 2c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2zm-4 6c0-1.1.9-2 2-2s2 .9 2 2-.9 2-2 2-2-.9-2-2z"/></svg>');
+            background-size: cover;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+        .auth-modal {
+            transition: all 0.3s ease;
+            opacity: 0;
+            pointer-events: none;
+        }
+        .auth-modal.active {
+            opacity: 1;
+            pointer-events: all;
+        }
+        @media (max-width: 640px) {
+            .sidebar {
+                transform: translateX(-100%);
+                transition: transform 0.3s ease;
+            }
+            .sidebar.open {
+                transform: translateX(0);
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 font-sans">
+    <!-- Navigation -->
+    <nav class="bg-green-600 text-white shadow-lg">
+        <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+            <div class="flex items-center space-x-2">
+                <i class="fas fa-pizza-slice text-2xl"></i>
+                <h1 class="text-xl font-bold">Vegan Pizza BCN</h1>
+            </div>
+            <div class="flex items-center space-x-4">
+                <button id="mobile-menu-button" class="md:hidden text-2xl">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <div class="hidden md:flex space-x-4">
+                    <button id="auth-button" class="hover:bg-green-700 px-3 py-1 rounded">Sign In</button>
+                    <button id="add-place-button" class="bg-yellow-500 hover:bg-yellow-600 px-3 py-1 rounded hidden">Add Place</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Mobile Sidebar -->
+    <div id="mobile-sidebar" class="sidebar fixed inset-y-0 left-0 w-64 bg-white shadow-lg z-50 md:hidden">
+        <div class="p-4 border-b">
+            <div class="flex justify-between items-center">
+                <h2 class="text-lg font-semibold">Menu</h2>
+                <button id="close-sidebar" class="text-2xl">&times;</button>
+            </div>
+        </div>
+        <div class="p-4 space-y-4">
+            <button id="mobile-auth-button" class="w-full text-left py-2 hover:bg-gray-100 rounded px-2">Sign In</button>
+            <button id="mobile-add-place-button" class="w-full text-left py-2 hover:bg-gray-100 rounded px-2 hidden">Add Place</button>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="container mx-auto px-4 py-6 flex flex-col md:flex-row">
+        <!-- Sidebar -->
+        <div class="w-full md:w-1/3 lg:w-1/4 pr-0 md:pr-6 mb-6 md:mb-0">
+            <div class="bg-white rounded-lg shadow p-4 sticky top-4">
+                <h2 class="text-xl font-bold mb-4 text-green-700">Find Vegan Pizza</h2>
+                
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Search</label>
+                    <div class="relative">
+                        <input type="text" id="search-input" placeholder="Search places..." 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
+                        <button id="search-button" class="absolute right-2 top-2 text-gray-500 hover:text-green-600">
+                            <i class="fas fa-search"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Filter by</label>
+                    <select id="filter-select" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
+                        <option value="all">All Places</option>
+                        <option value="fully-vegan">Fully Vegan</option>
+                        <option value="vegan-options">Vegan Options</option>
+                        <option value="top-rated">Top Rated (4+ stars)</option>
+                    </select>
+                </div>
+                
+                <div id="places-list" class="space-y-3 max-h-96 overflow-y-auto">
+                    <!-- Places will be loaded here -->
+                    <div class="text-center py-4 text-gray-500">
+                        <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+                        <p>Loading places...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Map -->
+        <div class="w-full md:w-2/3 lg:w-3/4">
+            <div class="bg-white rounded-lg shadow overflow-hidden">
+                <div id="map" class="map-container w-full"></div>
+            </div>
+            
+            <div class="mt-6 bg-white rounded-lg shadow p-4">
+                <h2 class="text-xl font-bold mb-4 text-green-700">About Vegan Pizza Barcelona</h2>
+                <p class="text-gray-700 mb-4">
+                    Discover the best plant-based pizza spots in Barcelona! Our community-curated map helps you find fully vegan pizzerias and restaurants with great vegan pizza options.
+                </p>
+                <div class="flex flex-wrap gap-2">
+                    <span class="bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded">100% Vegan</span>
+                    <span class="bg-yellow-100 text-yellow-800 text-xs font-medium px-2.5 py-0.5 rounded">Vegan Options</span>
+                    <span class="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded">Gluten-Free</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Auth Modal -->
+    <div id="auth-modal" class="auth-modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold text-gray-800">Sign In</h3>
+                <button id="close-auth-modal" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+            </div>
+            
+            <div class="space-y-4">
+                <button id="google-auth" class="w-full bg-red-500 hover:bg-red-600 text-white py-2 px-4 rounded flex items-center justify-center space-x-2">
+                    <i class="fab fa-google"></i>
+                    <span>Continue with Google</span>
+                </button>
+                
+                <button id="apple-auth" class="w-full bg-black hover:bg-gray-800 text-white py-2 px-4 rounded flex items-center justify-center space-x-2">
+                    <i class="fab fa-apple"></i>
+                    <span>Continue with Apple</span>
+                </button>
+                
+                <div class="flex items-center">
+                    <div class="flex-grow border-t border-gray-300"></div>
+                    <span class="px-3 text-gray-500">or</span>
+                    <div class="flex-grow border-t border-gray-300"></div>
+                </div>
+                
+                <div>
+                    <label for="email" class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                    <input type="email" id="email" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="your@email.com">
+                </div>
+                
+                <div>
+                    <label for="password" class="block text-sm font-medium text-gray-700 mb-1">Password</label>
