@@ -10,6 +10,62 @@
     <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore-compat.js"></script>
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyDNg3C5Gxf56ea8NmHgC7TXCfNXhFEu0Fs",
+            authDomain: "vegan-pizza-map-app.firebaseapp.com",
+            projectId: "vegan-pizza-map-app",
+            storageBucket: "vegan-pizza-map-app.firebasestorage.app",
+            messagingSenderId: "285176441089",
+            appId: "1:285176441089:web:9e930a18c77bdba9f05300",
+            measurementId: "G-CM9FEG7SJG",
+            mapsApiKey: "AIzaSyCdRtHM67qBwUWZMmgncjkU84Ad9cKJpvA"
+        };
+      
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+      
+        // Sign in with Google
+        document.getElementById("google-auth").onclick = () => {
+          const provider = new firebase.auth.GoogleAuthProvider();
+          auth.signInWithPopup(provider).then(result => {
+            document.getElementById("auth-modal").classList.remove("active");
+            document.getElementById("add-place-button").classList.remove("hidden");
+            document.getElementById("mobile-add-place-button").classList.remove("hidden");
+          });
+        };
+      
+        // Add place (example function)
+        document.getElementById("add-place-button").onclick = () => {
+          const place = {
+            name: "Sample Vegan Pizza Spot",
+            lat: 41.3851,
+            lng: 2.1734,
+            type: "fully-vegan",
+            rating: 4.5,
+          };
+          db.collection("places").add(place).then(() => {
+            alert("Place added!");
+          });
+        };
+      
+        // Load places on page load
+        window.onload = () => {
+          db.collection("places").get().then(snapshot => {
+            const list = document.getElementById("places-list");
+            list.innerHTML = '';
+            snapshot.forEach(doc => {
+              const data = doc.data();
+              const div = document.createElement("div");
+              div.className = "p-2 bg-gray-100 rounded";
+              div.textContent = `${data.name} (${data.type})`;
+              list.appendChild(div);
+            });
+          });
+        };
+      </script>
+      
     <style>
         .map-container {
             height: 60vh;
@@ -57,6 +113,7 @@
                 </button>
                 <div class="hidden md:flex space-x-4">
                     <button id="auth-button" class="hover:bg-green-700 px-3 py-1 rounded">Sign In</button>
+                    <button id="sign-up-button" class="hover:bg-green-700 px-3 py-1 rounded">Sign Up</button>
                     <button id="add-place-button" class="bg-yellow-500 hover:bg-yellow-600 px-3 py-1 rounded hidden">Add Place</button>
                 </div>
             </div>
